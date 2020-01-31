@@ -8,26 +8,23 @@ RUN apk update
 # Needed to build cffi
 RUN apk add python-dev build-base libffi-dev
 COPY . /code
+WORKDIR /code
+
 RUN mkdir /install
 RUN pip install --no-warn-script-location \
                 --prefix=/install \
                 /code --requirement /code/docker-requirements.txt
 
 FROM base
-
-RUN addgroup -S -g 9898 pypiserver \
-    && adduser -S -u 9898 -G pypiserver pypiserver \
-    && mkdir -p /data/packages \
-    && chown -R pypiserver:pypiserver /data/packages \
-    # Set the setgid bit so anything added here gets associated with the
-    # pypiserver group
-    && chmod g+s /data/packages
-
-# Copy the libraries installed via pip
 COPY --from=builder /install /usr/local
-USER pypiserver
+RUN cd / && mkdir -p /data/packages
+
+RUN echo bricks-dev:{SHA}bdInDHy/CH0Ag8zZegzcNJzjwsY= > htpasswd.txt
+RUN mv htpasswd.txt /data/htpasswd.txt
+
+ENV PYTHONUNBUFFERED=0
+
 VOLUME /data/packages
 WORKDIR /data
-EXPOSE 8080
-ENTRYPOINT ["pypi-server", "-p", "8080"]
-CMD ["packages"]
+EXPOSE 8080/tcp
+ENTRYPOINT ["pypi-server","-v", "-p","8080","-P","/data/htpasswd.txt","-a","list,update,download","-r", "packages"]
